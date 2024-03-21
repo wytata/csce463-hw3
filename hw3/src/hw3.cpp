@@ -28,6 +28,8 @@ int main(int argc, char** argv) {
 	lossForward = std::stod(argv[5]);
 	lossReturn = std::stod(argv[6]);
 
+	char* targetHost = argv[1];
+
 	printf("Main:\tsender W = %d, RTT %.3f sec, loss %g / %g, link %.3f Mbps\n", senderWindow, roundTripDelay, lossForward, lossReturn, linkSpeed);
 
 	clock_t startTime = clock();
@@ -58,6 +60,13 @@ int main(int argc, char** argv) {
 	lp.speed = 1e6 * linkSpeed;
 	lp.pLoss[FORWARD_PATH] = lossForward;
 	lp.pLoss[RETURN_PATH] = lossReturn;
+	lp.bufferSize = senderWindow + 3; // W + R
+
+	senderSocket sender;
+	if (sender.open(targetHost, MAGIC_PORT, senderWindow, &lp) != STATUS_OK) {
+		delete[] dwordBuf;
+		return 1;
+	}
 
 	delete[] dwordBuf;
 	WSACleanup();

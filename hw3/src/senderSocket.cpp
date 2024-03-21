@@ -15,7 +15,49 @@ senderSocket::senderSocket() {
 }
 
 int senderSocket::open(char* targetHost, int port, int senderWindow, LinkProperties* lp) {
-	return 0;
+
+	struct sockaddr_in remote;
+	struct hostent* host;
+
+	host = gethostbyname(targetHost);
+	if (host == NULL) {
+		printf("Failed to get IP for host. Got error %d\n", WSAGetLastError());
+		return INVALID_NAME;
+	}
+
+	memset(&remote, 0, sizeof(remote));
+	remote.sin_family = AF_INET;
+	memcpy((char*)&(remote.sin_addr), host->h_addr, host->h_length);
+	remote.sin_port = htons(port);
+	int remoteLen = sizeof(remote);
+
+	SenderDataHeader sdh;
+	SenderSynHeader syn;
+
+	sdh.flags.SYN = 1;
+	syn.lp = *lp;
+	syn.sdh = sdh;
+
+	ReceiverHeader rh;
+	int bytes;
+
+	clock_t connectionStart = clock();
+	for (int i = 0; i < 3; i++) {
+
+		if (sendto(sock, (char*)&syn, sizeof(SenderSynHeader), 0, (struct sockaddr*)&remote, remoteLen) == SOCKET_ERROR) {
+			printf("sendto() failed with return code %d\n", WSAGetLastError());
+			return FAILED_SEND;
+		};
+
+
+		if ((bytes = recvfrom(sock, (char*)&rh, sizeof(rh), 0, (struct sockaddr*)&remote, &remoteLen) == SOCKET_ERROR)) {
+			printf("recvfrom() failed with return code %d\n", WSAGetLastError());
+			return FAILED_RECV;
+		}
+	}
+
+			
+	return STATUS_OK;
 }
 
 int senderSocket::send() {
