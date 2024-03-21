@@ -24,6 +24,6 @@
 #include <time.h>
 #include "senderSocket.h"
 #include "networkClasses.h"
-#include <vld.h> // Visual leak detector
+//#include <vld.h> // Visual leak detector
 
 #endif //PCH_H

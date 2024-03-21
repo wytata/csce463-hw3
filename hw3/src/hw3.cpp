@@ -62,11 +62,16 @@ int main(int argc, char** argv) {
 	lp.pLoss[RETURN_PATH] = lossReturn;
 	lp.bufferSize = senderWindow + 3; // W + R
 
+	int sendResult;
 	senderSocket sender;
-	if (sender.open(targetHost, MAGIC_PORT, senderWindow, &lp) != STATUS_OK) {
+	clock_t connectionStart = clock();
+	if ((sendResult = sender.open(targetHost, MAGIC_PORT, senderWindow, &lp)) != STATUS_OK) {
 		delete[] dwordBuf;
+		printf("Main:\tconnect failed with status %d\n", sendResult);
 		return 1;
 	}
+
+	printf("Main:\tconnected to %s in %.3f sec, pkt size %d bytes\n", targetHost, ((double)(clock() - connectionStart)/CLOCKS_PER_SEC), MAX_PKT_SIZE);
 
 	delete[] dwordBuf;
 	WSACleanup();

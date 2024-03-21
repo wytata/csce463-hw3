@@ -1,2 +1,8 @@
 ﻿  senderSocket.cpp
-  hw3.vcxproj -> C:\Users\Wyatt\school\csce463\hw3\bin\x64\Debug\hw3.exe
+C:\Users\cadewya\school\csce463-hw3\hw3\src\senderSocket.cpp(57,29): warning C4838: conversion from 'double' to 'long' requires a narrowing conversion
+  (compiling source file '/src/senderSocket.cpp')
+  
+C:\Users\cadewya\school\csce463-hw3\hw3\src\senderSocket.cpp(57,29): warning C4244: 'initializing': conversion from 'double' to 'long', possible loss of data
+  (compiling source file '/src/senderSocket.cpp')
+  
+  hw3.vcxproj -> C:\Users\cadewya\school\csce463-hw3\bin\x64\Debug\hw3.exe
