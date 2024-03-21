@@ -3,6 +3,7 @@
 senderSocket::senderSocket() {
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	RTO = 1;
+	connected = false;
 	memset(&remote, 0, sizeof(remote));
 
 	struct sockaddr_in local;
@@ -17,6 +18,10 @@ senderSocket::senderSocket() {
 }
 
 int senderSocket::open(char* targetHost, int port, int senderWindow, LinkProperties* lp) {
+	if (connected) {
+		return ALREADY_CONNECTED;
+	}
+
 	clock_t connectionStart = clock();
 
 	struct hostent* host;
@@ -80,6 +85,7 @@ int senderSocket::open(char* targetHost, int port, int senderWindow, LinkPropert
 		}
 	}
 
+	connected = true;
 	return STATUS_OK;
 }
 
@@ -88,5 +94,58 @@ int senderSocket::send() {
 }
 
 int senderSocket::close() {
-	return 0;
+	if (!connected) {
+		return NOT_CONNECTED;
+	}
+
+	clock_t terminationStart = clock();
+
+	int remoteLen = sizeof(remote);
+
+	SenderDataHeader sdh;
+	sdh.seq = 0;
+	sdh.flags.FIN = 1;
+
+	ReceiverHeader rh;
+	int bytes;
+
+	double sendTime, recvTime;
+	for (int i = 0; i < 5; i++) {
+
+		if (sendto(sock, (char*)&sdh, sizeof(SenderDataHeader), 0, (struct sockaddr*)&remote, remoteLen) == SOCKET_ERROR) {
+			printf("sendto() failed with return code %d\n", WSAGetLastError());
+			return FAILED_SEND;
+		};
+		sendTime = ((double)(clock() - terminationStart)) / CLOCKS_PER_SEC;
+		printf("[%.3f] --> FIN %d (attempt %d of 3, RTO %.3f) to %s\n", sendTime, sdh.seq, i+1, RTO, inet_ntoa(remote.sin_addr));
+
+		fd_set readfds;
+		const timeval timeout = { RTO, 0 };
+		FD_ZERO(&readfds);
+		FD_SET(sock, &readfds);
+		int available = select(0, &readfds, NULL, NULL, &timeout);
+
+		if (available > 0) {
+			if ((bytes = recvfrom(sock, (char*)&rh, sizeof(rh), 0, (struct sockaddr*)&remote, &remoteLen) == SOCKET_ERROR)) {
+				printf("recvfrom() failed with return code %d\n", WSAGetLastError());
+				return FAILED_RECV;
+			}
+			else {
+				recvTime = ((double)(clock() - terminationStart)) / CLOCKS_PER_SEC;
+				RTO = 3 * (recvTime - sendTime);
+				printf("[%.3f] <-- FIN-ACK %d window %d\n", recvTime, rh.ackSeq, rh.recvWnd);
+				break;
+			}
+		}
+		else if (available != 0) { 
+			printf("select() failed with error code %d\n", WSAGetLastError());
+			return FAILED_RECV;
+		}
+		else if (i == 4 && available == 0) { // timeout after max attempts
+			return TIMEOUT;
+		}
+	}
+
+	connected = false;
+	return STATUS_OK;
 }

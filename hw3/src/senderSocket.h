@@ -18,6 +18,7 @@ class senderSocket {
 	SOCKET sock;
 	struct sockaddr_in remote;
 	double RTO;
+	bool connected;
 	public:
 		senderSocket();
 		int open(char* targetHost, int port, int senderWindow, LinkProperties* lp);

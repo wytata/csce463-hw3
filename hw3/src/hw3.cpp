@@ -72,6 +72,11 @@ int main(int argc, char** argv) {
 	}
 
 	printf("Main:\tconnected to %s in %.3f sec, pkt size %d bytes\n", targetHost, ((double)(clock() - connectionStart)/CLOCKS_PER_SEC), MAX_PKT_SIZE);
+	
+	int closeResult;
+	if ((closeResult = sender.close()) != STATUS_OK) {
+		printf("Main:\tterminate failed with status %d\n", closeResult);
+	}
 
 	delete[] dwordBuf;
 	WSACleanup();
