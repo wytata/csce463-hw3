@@ -71,12 +71,18 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	printf("Main:\tconnected to %s in %.3f sec, pkt size %d bytes\n", targetHost, ((double)(clock() - connectionStart)/CLOCKS_PER_SEC), MAX_PKT_SIZE);
+	clock_t connectionFinish = clock();
+	printf("Main:\tconnected to %s in %.3f sec, pkt size %d bytes\n", targetHost, ((double)(connectionFinish - connectionStart)/CLOCKS_PER_SEC), MAX_PKT_SIZE);
 	
 	int closeResult;
+	clock_t terminationStart = clock();
 	if ((closeResult = sender.close()) != STATUS_OK) {
 		printf("Main:\tterminate failed with status %d\n", closeResult);
+		delete[] dwordBuf;
+		return 1;
 	}
+
+	printf("Main:\ttransfer finished in %.3f sec\n", ((double)(terminationStart - connectionFinish)/CLOCKS_PER_SEC));
 
 	delete[] dwordBuf;
 	WSACleanup();

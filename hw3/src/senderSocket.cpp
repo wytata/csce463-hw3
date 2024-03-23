@@ -4,6 +4,7 @@ senderSocket::senderSocket() {
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
 	RTO = 1;
 	connected = false;
+	connectionStart = clock();
 	memset(&remote, 0, sizeof(remote));
 
 	struct sockaddr_in local;
@@ -21,8 +22,6 @@ int senderSocket::open(char* targetHost, int port, int senderWindow, LinkPropert
 	if (connected) {
 		return ALREADY_CONNECTED;
 	}
-
-	clock_t connectionStart = clock();
 
 	struct hostent* host;
 
@@ -50,13 +49,14 @@ int senderSocket::open(char* targetHost, int port, int senderWindow, LinkPropert
 
 	double sendTime, recvTime;
 	for (int i = 0; i < 3; i++) {
+		sendTime = ((double)(clock() - connectionStart)) / CLOCKS_PER_SEC;
+		printf("[%.3f] --> ", sendTime);
 
 		if (sendto(sock, (char*)&syn, sizeof(SenderSynHeader), 0, (struct sockaddr*)&remote, remoteLen) == SOCKET_ERROR) {
-			printf("sendto() failed with return code %d\n", WSAGetLastError());
+			printf("failed sendto with %d\n", WSAGetLastError());
 			return FAILED_SEND;
 		};
-		sendTime = ((double)(clock() - connectionStart)) / CLOCKS_PER_SEC;
-		printf("[%.3f] --> SYN %d (attempt %d of 3, RTO %.3f) to %s\n", sendTime, sdh.seq, i+1, 1.000, inet_ntoa(remote.sin_addr));
+		printf("SYN %d (attempt %d of 3, RTO %.3f) to %s\n", sdh.seq, i+1, 1.000, inet_ntoa(remote.sin_addr));
 
 		fd_set readfds;
 		const timeval timeout = { RTO, 0 };
@@ -65,14 +65,16 @@ int senderSocket::open(char* targetHost, int port, int senderWindow, LinkPropert
 		int available = select(0, &readfds, NULL, NULL, &timeout);
 
 		if (available > 0) {
+			connectionFinish = clock();
+			recvTime = ((double)(connectionFinish - connectionStart)) / CLOCKS_PER_SEC;
+			printf("[%.3f] <--- ", recvTime);
 			if ((bytes = recvfrom(sock, (char*)&rh, sizeof(rh), 0, (struct sockaddr*)&remote, &remoteLen) == SOCKET_ERROR)) {
 				printf("recvfrom() failed with return code %d\n", WSAGetLastError());
 				return FAILED_RECV;
 			}
 			else {
-				recvTime = ((double)(clock() - connectionStart)) / CLOCKS_PER_SEC;
 				RTO = 3 * (recvTime - sendTime);
-				printf("[%.3f] <-- SYN-ACK %d window %d; setting initial RTO to %.3f\n", recvTime, rh.ackSeq, rh.recvWnd, RTO);
+				printf("SYN-ACK %d window %d; setting initial RTO to %.3f\n", rh.ackSeq, rh.recvWnd, RTO);
 				break;
 			}
 		}
@@ -98,7 +100,7 @@ int senderSocket::close() {
 		return NOT_CONNECTED;
 	}
 
-	clock_t terminationStart = clock();
+	terminationStart = clock();
 
 	int remoteLen = sizeof(remote);
 
@@ -111,30 +113,33 @@ int senderSocket::close() {
 
 	double sendTime, recvTime;
 	for (int i = 0; i < 5; i++) {
+		sendTime = ((double)(clock() - connectionStart)) / CLOCKS_PER_SEC;
+		printf("[%.3f] --> ", sendTime);
 
 		if (sendto(sock, (char*)&sdh, sizeof(SenderDataHeader), 0, (struct sockaddr*)&remote, remoteLen) == SOCKET_ERROR) {
 			printf("sendto() failed with return code %d\n", WSAGetLastError());
 			return FAILED_SEND;
 		};
-		sendTime = ((double)(clock() - terminationStart)) / CLOCKS_PER_SEC;
-		printf("[%.3f] --> FIN %d (attempt %d of 3, RTO %.3f) to %s\n", sendTime, sdh.seq, i+1, RTO, inet_ntoa(remote.sin_addr));
+		printf("FIN %d (attempt %d of 5, RTO %.3f) to %s\n", sdh.seq, i+1, RTO, inet_ntoa(remote.sin_addr));
 
 		fd_set readfds;
-		const timeval timeout = { RTO, 0 };
+		const timeval timeout = { (long)(RTO / 1000), (long)(RTO * 1e6) };
 		FD_ZERO(&readfds);
 		FD_SET(sock, &readfds);
 		int available = select(0, &readfds, NULL, NULL, &timeout);
 
 		if (available > 0) {
+			terminationFinish = clock();
+			recvTime = ((double)(terminationFinish - connectionStart)) / CLOCKS_PER_SEC;
+			printf("[%.3f] <-- ", recvTime);
 			if ((bytes = recvfrom(sock, (char*)&rh, sizeof(rh), 0, (struct sockaddr*)&remote, &remoteLen) == SOCKET_ERROR)) {
 				printf("recvfrom() failed with return code %d\n", WSAGetLastError());
 				return FAILED_RECV;
 			}
 			else {
-				recvTime = ((double)(clock() - terminationStart)) / CLOCKS_PER_SEC;
-				RTO = 3 * (recvTime - sendTime);
-				printf("[%.3f] <-- FIN-ACK %d window %d\n", recvTime, rh.ackSeq, rh.recvWnd);
-				break;
+				printf("FIN-ACK %d window %d\n", rh.ackSeq, rh.recvWnd);
+				connected = false;
+				return STATUS_OK;
 			}
 		}
 		else if (available != 0) { 

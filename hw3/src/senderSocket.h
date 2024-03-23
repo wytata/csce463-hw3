@@ -24,4 +24,5 @@ class senderSocket {
 		int open(char* targetHost, int port, int senderWindow, LinkProperties* lp);
 		int send();
 		int close();
+		clock_t connectionStart, connectionFinish, terminationStart, terminationFinish;
 };
